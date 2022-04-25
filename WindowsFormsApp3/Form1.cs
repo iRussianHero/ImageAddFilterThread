@@ -77,14 +77,16 @@ namespace WindowsFormsApp3
         }
 
         private void button4_Click(object sender, EventArgs e)
-        {
-            // TODO :: разделить картинку 
-
-            FilterAsync(2);
+        {            
+            Task task = new Task(new Action(() =>
+            {
+                ConvertImageAsync();
+            }));
+            task.Start();
         }
 
 
-        public void FilterAsync(int x)
+        public void ConvertImageAsync()
         {
             // Таймер
             // DateTime first = DateTime.Now;
@@ -99,7 +101,7 @@ namespace WindowsFormsApp3
             Point pictureBox3Point = new Point(pictureBox1.Width / 2, pictureBox1.Height / 2);
             Size half = new Size(pictureBox1.Width / 2, pictureBox1.Height / 2);
             /////////////////////////////////////////////////////////////////////////////////////
-            
+
             // Задать координаты по которым будет обрезаться исходная картинка
             /////////////////////////////////////////////////////////////////////////////////////
             Image img = pictureBox1.Image;
@@ -112,62 +114,70 @@ namespace WindowsFormsApp3
 
             // Разрезать картинку на 4 части
             //////////////////////////////////////////////////////////////////////////////////////
-            Image img1 = CutImage(src, rect0);
-            Image img2 = CutImage(src, rect2);
-            Image img3 = CutImage(src, rect1);
-            Image img4 = CutImage(src, rect3);
+            Image img0 = CutImage(src, rect0);
+            Image img1 = CutImage(src, rect2);
+            Image img2 = CutImage(src, rect1);
+            Image img3 = CutImage(src, rect3);
             //////////////////////////////////////////////////////////////////////////////////////
 
             // Нанести фильтр на разрезанные части в потоках
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            Task task0 = new Task(new Action(() =>
+             {
+                 Bitmap src0 = new Bitmap(img0, pictureBox1.Width, pictureBox1.Height);
+                 img0 = Filter(src0);
+             }));
+            task0.Start();
 
-            //Task task1 = new Task(new Action(() =>
-            //{
-            //    for (int i = 0; i < h /*/ x*/; i++)
-            //    {
-            //        for (int j = 0; j < w; ++j)
-            //        {
-            //            Color c = bitmap.GetPixel(j, i);
-            //            c = Color.FromArgb(c.G, c.B, c.R);
-            //            bitmap2.SetPixel(j, i, c);
-            //        }
-            //    }
-            //}));
-            //task1.Start();
-            //task1.Wait();
+            Task task1 = new Task(new Action(() =>
+            {
+                Bitmap src1 = new Bitmap(img1, pictureBox1.Width, pictureBox1.Height);
+                img1 = Filter(src1);
+            }));
+            task1.Start();
 
-            //Task task2 = new Task(new Action(() =>
-            //{
-            //    for (int i = h / 2; i < h; ++i)
-            //    {
-            //        for (int j = w / 2; j < w; ++j)
-            //        {
-            //            Color c = bitmap.GetPixel(j, i);
-            //            c = Color.FromArgb(c.G, c.B, c.R);
-            //            bitmap2.SetPixel(j, i, c);
-            //        }
-            //    }
-            //}));
-            //task2.Start();
-            //task2.Wait();
+            Task task2 = new Task(new Action(() =>
+            {
+                Bitmap src2 = new Bitmap(img2, pictureBox1.Width, pictureBox1.Height);
+                img2 = Filter(src2);
+            }));
+            task2.Start();
 
+            Task task3 = new Task(new Action(() =>
+            {
+                Bitmap src3 = new Bitmap(img3, pictureBox1.Width, pictureBox1.Height);
+                img3 = Filter(src3);
+            }));
+            task3.Start();
 
+            task0.Wait();
+            task1.Wait();
+            task2.Wait();
+            task3.Wait();
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            Task.Run(() => GlueImage(img0, img1, img2, img3, stopeWatch));
+        }
 
-
+        public Bitmap CutImage(Bitmap src, Rectangle rect)
+        {
+            Bitmap bmp = new Bitmap(src.Width, src.Height); //создаем битмап
+            Graphics g = Graphics.FromImage(bmp);
+            g.DrawImage(src, 0, 0, rect, GraphicsUnit.Pixel); //перерисовываем с источника по координатам
+            return bmp;
+        }
+        public void GlueImage(Image img0, Image img1, Image img2, Image img3, Stopwatch stopeWatch)
+        {
             // Склейка битмапов в картинку
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
             Bitmap resultImg = new Bitmap(pictureBox1.Width, pictureBox1.Height);
 
             Graphics g = Graphics.FromImage(resultImg);
 
-            g.DrawImage(img1, 0, 0);
-            g.DrawImage(img2, 0, img1.Height / 2);
-            g.DrawImage(img3, img3.Width / 2, 0);
-            g.DrawImage(img4, img4.Width / 2, img1.Height / 2);
+            g.DrawImage(img0, 0, 0);
+            g.DrawImage(img1, 0, img0.Height / 2);
+            g.DrawImage(img2, img2.Width / 2, 0);
+            g.DrawImage(img3, img3.Width / 2, img0.Height / 2);
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
             // Вывод картики в окно
             //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,16 +189,23 @@ namespace WindowsFormsApp3
             //MessageBox.Show((second - first).ToString());
             MessageBox.Show(stopeWatch.Elapsed.ToString());
             //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
         }
 
 
-        public Bitmap CutImage(Bitmap src, Rectangle rect)
+
+        public Image Filter(Bitmap img)
         {
-            Bitmap bmp = new Bitmap(src.Width, src.Height); //создаем битмап
-            Graphics g = Graphics.FromImage(bmp);
-            g.DrawImage(src, 0, 0, rect, GraphicsUnit.Pixel); //перерисовываем с источника по координатам
-            return bmp;
+            for (int i = 0; i < img.Height; ++i)
+            {
+                for (int j = 0; j < img.Width; ++j)
+                {
+                    Color color = img.GetPixel(j, i);
+                    color = Color.FromArgb(color.G, color.B, color.R);
+                    img.SetPixel(j, i, color);
+                }
+            }
+            Rectangle rect = new Rectangle(0, 0, img.Width, img.Height);
+            return CutImage(img, rect);
         }
     }
 }
